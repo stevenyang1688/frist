@@ -1,58 +1,58 @@
-FB_MonthlyCopy - README
+FB_MonthlyCopy - 说明文档
 
-Purpose
-- Copies per-room DINT values from D[500..797] to R[] targets on each month 26 at 00:00:00 (single-shot).
-- Uses year parity and month to select the R base address. Matches the mapping rules provided by the user.
+目的
+- 在每月 26 日 00:00:00（单次上升沿）将每房的 DINT 数据从 D[500..797] 复制到对应的 R[] 目标寄存器。
+- 根据年份单双年及月份选择 R 的基址，符合用户提供的映射规则。
 
-Mapping and formulas
-- Source (each room = DINT = 2 words):
+映射与公式
+- 源（每房 = DINT = 2 个 16-bit 字）：
   srcFirst = 500 + (floor - 2) * 50 + (roomIndex - 1) * 2
-  where roomIndex = room number's last two digits (e.g., 201 -> 1)
-  Valid source range: D[500] .. D[797]
+  其中 roomIndex 为房号的后两位序号（例如 201 -> 1）
+  有效源范围：D[500] .. D[797]
 
-- Target (per month, per parity):
+- 目标（按月与单双年）：
   baseAddr = (isEvenYear ? 5000 : 1000) + (month - 1) * 300
   dstFirst = baseAddr + (floor - 2) * 50 + (roomIndex * 2 - 1)
 
-- Floor/room counts used in code:
-  - Floor 2: 10 rooms (201..210)
-  - Floors 3..7: 24 rooms each (e.g., 301..324)
-  Total rooms covered: 130 rooms (2楼10 + 5楼*24 = 130)
+- 代码中使用的楼层/房数：
+  - 2 楼：10 间（201..210）
+  - 3..7 楼：每层 24 间（例如 301..324）
+  覆盖总房间数：130 间（2 楼 10 + 5 层 * 24 = 130）
 
-Trigger and edge-detection
-- Trigger condition: D[3]=26 AND D[4]=0 AND D[5]=0 AND D[6]=0
-- Rising-edge detection: uses internal bit M100 as previous-state store.
-  - M100 is an internal bit. Mark as Retain in the PLC variable settings if you want it retained across power cycles.
+触发与上升沿检测
+- 触发条件：D[3]=26 且 D[4]=0 且 D[5]=0 且 D[6]=0
+- 上升沿检测：使用内部位 M100 保存上次条件状态
+  - M100 为内部位。若希望其断电保留，请在工程变量中将 M100 标记为 Retain（保持）。
 
-Variable attributes (clarified)
-- D[...] (e.g., D[500..797])
-  - Type: Data registers (16-bit words). In usage each room is a DINT (32-bit) stored as two adjacent D words (low first, then high).
-  - Scope: Internal PLC registers (not physical inputs/outputs).
+变量属性说明
+- D[...]（例如 D[500..797]）
+  - 类型：数据寄存器（16-bit 字）。实际每房为 DINT（32-bit），按低字先、高字后存放于相邻两个 D。
+  - 作用域：PLC 内部寄存器（非物理输入/输出）。
 
-- R[...] (e.g., R[1001], R[5001], ...)
-  - Type: Internal holding registers (16-bit words).
-  - Scope: Internal PLC registers; can be exposed as Modbus Holding Registers in your Modbus configuration.
+- R[...]（例如 R[1001], R[5001] 等）
+  - 类型：保持寄存器（16-bit 字）。
+  - 作用域：PLC 内部保持寄存器；若需 Modbus 访问，请在 Modbus 配置中映射为 Holding Registers。
 
 - M100
-  - Type: Internal bit (flag). Used for edge detection. Set Retain if required.
+  - 类型：内部位（标志）。用于上升沿检测。如需断电保留，请设置为 Retain。
 
-Deployment & Test Steps
-1. Add FB_MonthlyCopy.ST to your AUTOSHOP project (Function Blocks / Structured Text area).
-2. Ensure the time registers D[1..6] are populated by RTC or other source.
-3. Ensure D[500..797] contain expected test data for selected rooms.
-4. Set M100 = FALSE for initial test (unless Retain desired).
-5. Manually set D[1..6] to simulate trigger: e.g., Year=2026, Month=8, Day=26, Hour=0, Min=0, Sec=0 and do a forced single scan/run of the FB.
-6. Verify R[] target addresses for few rooms (2楼 201..203) to confirm proper low/high word order and address mapping.
-7. Confirm Modbus master reads R[] in same word-order and reconstructs DINT accordingly.
+部署与测试步骤
+1. 将 FB_MonthlyCopy.ST 添加到 AUTOSHOP 项目的功能块 / 结构化文本区。
+2. 确保时间寄存器 D[1..6] 已由 RTC 或其他来源填充。
+3. 确保 D[500..797] 包含被测房间的测试数据。
+4. 初次测试时将 M100 置为 FALSE（如需 Retain 可跳过此步并在工程中设 Retain）。
+5. 手动设置 D[1..6] 以模拟触发：例如 Year=2026, Month=8, Day=26, Hour=0, Min=0, Sec=0，强制运行一次 FB。
+6. 验证少数目标 R 地址（如 2 楼 201..203）是否按预期写入（低字/高字顺序与地址映射）。
+7. 确认 Modbus 主站读取 R[] 时的字序与本工程一致，以正确重建 DINT。
 
-Notes and differences vs Siemens
-- This code uses D[]/R[]/M bits naming conventions (WeCl/Autoshop). Siemens uses DB/MW/QX naming — do not translate names blindly.
-- Writes are low-word then high-word. Ensure the Modbus master reads in the same ordering.
+与西门子差异说明
+- 代码使用 D[]/R[]/M 位的命名约定（汇川/Autoshop 风格）。西门子使用 DB/MW/QX 等命名，切勿直接按西门子命名翻译。
+- 写入顺序为低字先、高字后，请确保 Modbus 客户端按相同顺序读取。
 
-If you want:
-- I can convert this FB to Ladder (LD) or to a project export snippet.
-- I can mark M100 as Retain in the project file if you confirm Retain is desired.
+后续支持
+- 可将此 FB 转换为梯形图（LD）或导出为工程片段。
+- 若确认需要 M100 为 Retain，我可以在提交中把相应注释和建议标注清楚。
 
-Commit information
-- Files added: FB_MonthlyCopy.ST, README_AUTOSHOP_MONTHLY_COPY.md
+提交信息
+- 已添加文件：FB_MonthlyCopy.ST, README_AUTOSHOP_MONTHLY_COPY.md
 
