@@ -74,8 +74,9 @@ IF bEdge THEN
   END_FOR;
 END_IF;
 
-// Persist current trigger condition into M100 for next scan edge detection
-// If you want M100 retained across power cycles, mark M100 as Retain in the project variables
+// 将当前触发条件保存到 M100 以便下一次扫描做上升沿检测
+// 注意：M100 为内部位。如果需要断电保留（Retain），请在工程变量设置中将 M100 标记为 Retain。
+// 在 AUTOSHOP 工程中：在变量表中找到 M100，勾选 "Retain"（或类似选项），以确保断电后仍保留状态。
 M100 := bCond;
 
 END_FUNCTION_BLOCK
